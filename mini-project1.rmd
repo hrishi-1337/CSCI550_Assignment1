@@ -1,0 +1,163 @@
+---
+title: "mini-project1"
+author: "Chris Corona"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r EDA}
+library(tidyverse)
+data <- read_csv("Customer_telecom.csv")
+
+# take a peak at the data
+head(data)
+
+# immediately drop phone number as a predictor
+data <- data[,-4]
+
+# check structure of data
+str(data)
+# change strings into factors
+data$state <- factor(data$state)
+data$`area code` <- factor(data$`area code`)
+data$`international plan` <- factor(data$`international plan`)
+data$`voice mail plan` <- factor(data$`voice mail plan`)
+# recheck structure of data to make sure factoring worked
+str(data)
+
+# check for missing data - NO MISSING DATA!!
+library(mice)
+md.pattern(data, rotate.names=TRUE)
+
+# check for balance - NOT BALANCED, FALSE=2850, TRUE=483
+library(ggplot2)
+ggplot(data=data, aes(x=churn)) +
+  geom_bar() +
+  geom_text(stat='count', aes(label=..count..), vjust=-0.2) +
+  ggtitle("Number of samples for each response category")
+
+# summary statistics to check for any strangeness in the data - NO ISSUES OBSERVED
+summary(data)
+
+# let's look at the few categorical predictors
+library(GGally)
+ggpairs(data[,c(3,4,5,20)], upper = list(continuous = GGally::wrap(ggally_cor,
+                                               size = 3,
+                                               color ="black",
+                                               stars = F)))
+# it seems state actually has some predictive capabilities (surprisingly)
+# but only a few states are meaningful - it's not worth it to include all 51 states
+ggplot(data, aes(x=state, fill=churn, color=churn)) +
+  geom_bar(position="dodge") +
+  scale_x_discrete(guide = guide_axis(angle = 90))
+lm.state <- glm(churn ~ state, data=data, family="binomial")
+summary(lm.state)
+lm.areacode <- glm(churn ~ `area code`, data=data, family="binomial")
+summary(lm.areacode)
+# drop state and area code
+data <- data[,c(-1,-3)]
+
+# now let's look for correlation between quantitative predictors/response
+cor(data[,c(1,4:18)])
+# drop uncorrelated categories - account length, day calls, eve calls, night calls
+# drop one of the highly correlated pairs - day charge, eve charge, night charge
+data <- data[,c(-1,-6,-7,-9,-10,-12,-13,-16)]
+
+# final check of structure - 10 predictors, 1 response
+str(data)
+
+# plot the remaining quantitative variables' pairwise correlation
+ggpairs(data = data[,3:10], upper = list(continuous = GGally::wrap(ggally_cor,
+                                                            size = 3,
+                                                            color ="black",
+                                                            stars = F)))
+```
+
+```{r Train Test Split}
+set.seed(5544)
+split_index <- sample(c(TRUE,FALSE), nrow(data), replace=TRUE, prob=c(0.7, 0.3))
+train <- data[split_index,]
+test <- data[!split_index,]
+```
+
+
+```{r Logistic Regression}
+# model 1: use all the filters
+lm.all <- glm(churn ~ ., data=train, family="binomial")
+summary(lm.all)
+lm.all.prob <- predict(lm.all, newdata=test, type="response")
+lm.all.pred <- rep(FALSE, nrow(test))
+lm.all.pred[lm.all.prob > 0.65] <- TRUE
+table(lm.all.pred, test$churn)
+lm.all.accuracy <- mean(lm.all.pred == test$churn)
+lm.all.accuracy
+library(pROC)
+roc_score=roc(as.numeric(test$churn), as.numeric(lm.all.pred)) #AUC score
+plot(roc_score ,main ="ROC curve -- Logistic Regression ")
+
+# model 2: remove the least significant predictors
+lm2 <- glm(churn ~ . -`number vmail messages` -`total night minutes` -`total intl calls`, data=train, family="binomial")
+summary(lm2)
+lm2.prob <- predict(lm2, newdata=test, type="response")
+lm2.pred <- rep(FALSE, nrow(test))
+lm2.pred[lm2.prob > 0.65] <- TRUE
+table(lm2.pred, test$churn)
+lm2.accuracy <- mean(lm2.pred == test$churn)
+lm2.accuracy
+roc_score=roc(as.numeric(test$churn), as.numeric(lm2.pred)) #AUC score
+plot(roc_score ,main ="ROC curve -- Logistic Regression ")
+
+# model 3: only use the most significant predictors
+lm3 <- glm(churn ~ `international plan` + `total day minutes` + `customer service calls`, data=train, family="binomial")
+summary(lm3)
+lm3.prob <- predict(lm3, newdata=test, type="response")
+lm3.pred <- rep(FALSE, nrow(test))
+lm3.pred[lm3.prob > 0.65] <- TRUE
+table(lm3.pred, test$churn)
+lm3.accuracy <- mean(lm3.pred == test$churn)
+lm3.accuracy
+roc_score=roc(as.numeric(test$churn), as.numeric(lm3.pred)) #AUC score
+plot(roc_score ,main ="ROC curve -- Logistic Regression ")
+```
+
+
+```{r LDA}
+library(MASS)
+lda.fit <- lda(churn ~ ., data=train)
+lda.fit
+plot(lda.fit)
+
+lda.prob <- predict(lda.fit, newdata=test)
+lda.pred <- rep(TRUE, nrow(test))
+lda.pred[lda.prob$posterior[,1] > 0.65] <- FALSE
+table(lda.pred, test$churn)
+lda.accuracy <- mean(lda.pred == test$churn)
+lda.accuracy
+```
+
+```{r QDA}
+qda.fit <- qda(churn ~ ., data=train)
+qda.fit
+
+qda.prob <- predict(qda.fit, newdata=test)
+qda.pred <- rep(TRUE, nrow(test))
+qda.pred[qda.prob$posterior[,1] > 0.65] <- FALSE
+table(qda.pred, test$churn)
+qda.accuracy <- mean(qda.pred == test$churn)
+qda.accuracy
+```
+
+```{r Naive Bayes}
+library(e1071)
+nb.fit <- naiveBayes(churn ~ ., data=train)
+nb.fit
+
+nb.pred <- predict(nb.fit, newdata=test)
+table(nb.pred, test$churn)
+nb.accuracy <- mean(nb.pred == test$churn)
+nb.accuracy
+```
