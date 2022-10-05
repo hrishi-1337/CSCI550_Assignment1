@@ -86,19 +86,31 @@ test <- data[!split_index,]
 
 
 ```{r Logistic Regression}
-# model 1: use all the filters
+# model 1: use all the predictors
 lm.all <- glm(churn ~ ., data=train, family="binomial")
 summary(lm.all)
 lm.all.prob <- predict(lm.all, newdata=test, type="response")
 lm.all.pred <- rep(FALSE, nrow(test))
 lm.all.pred[lm.all.prob > 0.65] <- TRUE
 table(lm.all.pred, test$churn)
-lm.all.accuracy <- mean(lm.all.pred == test$churn)
-lm.all.accuracy
-library(pROC)
-roc_score=roc(as.numeric(test$churn), as.numeric(lm.all.pred)) #AUC score
-plot(roc_score ,main ="ROC curve -- Logistic Regression ")
 
+score <- function(prediction, actual) {
+  cat("Accuracy: ", mean(prediction == actual), "\n")
+  precision <- sum(prediction == TRUE & prediction == actual)/sum(prediction == TRUE)
+  cat("Precision: ", precision, "\n")
+  recall <- sum(prediction == TRUE & prediction == actual)/sum(actual == TRUE)
+  cat("Recall: ", recall, "\n")
+  cat("F1: ", 2*precision*recall/(precision+recall), "\n")
+}
+
+score(lm.all.pred, test$churn)
+
+#library(pROC)
+#roc_score=roc(as.numeric(test$churn), as.numeric(lm.all.pred)) #AUC score
+#plot(roc_score ,main ="ROC curve -- Logistic Regression ")
+```
+
+```{r}
 # model 2: remove the least significant predictors
 lm2 <- glm(churn ~ . -`number vmail messages` -`total night minutes` -`total intl calls`, data=train, family="binomial")
 summary(lm2)
@@ -106,10 +118,9 @@ lm2.prob <- predict(lm2, newdata=test, type="response")
 lm2.pred <- rep(FALSE, nrow(test))
 lm2.pred[lm2.prob > 0.65] <- TRUE
 table(lm2.pred, test$churn)
-lm2.accuracy <- mean(lm2.pred == test$churn)
-lm2.accuracy
-roc_score=roc(as.numeric(test$churn), as.numeric(lm2.pred)) #AUC score
-plot(roc_score ,main ="ROC curve -- Logistic Regression ")
+score(lm2.pred, test$churn)
+#roc_score=roc(as.numeric(test$churn), as.numeric(lm2.pred)) #AUC score
+#plot(roc_score ,main ="ROC curve -- Logistic Regression ")
 
 # model 3: only use the most significant predictors
 lm3 <- glm(churn ~ `international plan` + `total day minutes` + `customer service calls`, data=train, family="binomial")
@@ -118,10 +129,9 @@ lm3.prob <- predict(lm3, newdata=test, type="response")
 lm3.pred <- rep(FALSE, nrow(test))
 lm3.pred[lm3.prob > 0.65] <- TRUE
 table(lm3.pred, test$churn)
-lm3.accuracy <- mean(lm3.pred == test$churn)
-lm3.accuracy
-roc_score=roc(as.numeric(test$churn), as.numeric(lm3.pred)) #AUC score
-plot(roc_score ,main ="ROC curve -- Logistic Regression ")
+score(lm3.pred, test$churn)
+#roc_score=roc(as.numeric(test$churn), as.numeric(lm3.pred)) #AUC score
+#plot(roc_score ,main ="ROC curve -- Logistic Regression ")
 ```
 
 
@@ -135,8 +145,7 @@ lda.prob <- predict(lda.fit, newdata=test)
 lda.pred <- rep(TRUE, nrow(test))
 lda.pred[lda.prob$posterior[,1] > 0.65] <- FALSE
 table(lda.pred, test$churn)
-lda.accuracy <- mean(lda.pred == test$churn)
-lda.accuracy
+score(lda.pred, test$churn)
 ```
 
 ```{r QDA}
@@ -147,8 +156,7 @@ qda.prob <- predict(qda.fit, newdata=test)
 qda.pred <- rep(TRUE, nrow(test))
 qda.pred[qda.prob$posterior[,1] > 0.65] <- FALSE
 table(qda.pred, test$churn)
-qda.accuracy <- mean(qda.pred == test$churn)
-qda.accuracy
+score(qda.pred, test$churn)
 ```
 
 ```{r Naive Bayes}
@@ -158,6 +166,5 @@ nb.fit
 
 nb.pred <- predict(nb.fit, newdata=test)
 table(nb.pred, test$churn)
-nb.accuracy <- mean(nb.pred == test$churn)
-nb.accuracy
+score(nb.pred, test$churn)
 ```
