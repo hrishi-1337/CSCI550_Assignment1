@@ -18,6 +18,10 @@ Our analysis of the telecom customer data set achieved great results. We are abl
 The data set is from a telephone service provider that tracked 20 metrics - 5 categorical and 15 quantitative - to try to predict whether or not the customer would churn. There are 3333 observations in this unbalanced data set with 2850 `FALSE`  responses and 483 `TRUE` responses. As a preprocessing step, we split our data into train and test sets. We split at 70\% to 30\% so there are 2324 training and 1009 testing observations. Of the training observations, there are 1982 `FALSE` responses and 342 `TRUE` responses.  Of the testing observations, there are 868 `FALSE` responses and 141 `TRUE` responses. This seems like reasonable unbalance compared to the original data set.
 
 ```{r Train Test Split}
+# read in the data set
+library(tidyverse)
+data <- read_csv("Customer_telecom.csv")
+
 # split data into train and test sets
 set.seed(5544)
 split_index <- sample(c(TRUE,FALSE), nrow(data), replace=TRUE, prob=c(0.7, 0.3))
@@ -33,9 +37,6 @@ table(test$churn)
 In our Exploratory Data Analysis (EDA) we rigorously reviewed the data for any issues and reduced the number of predictors from 20 down to just 9. We first checked for any missing data; there is none. Then we checked the balance of the data set; it is very unbalanced with 2850 `FALSE` responses and 483 `TRUE` responses. We looked at the summary statistics to find any outliers; it appears that there are no extreme observations. The next task was to attempt to reduce the number of predictors by dropping any that are uncorrelated with the response or are strongly correlated with another predictor. We discovered that the `total_x_minutes` is strongly correlated with `total_x_charge` so we could drop one of them. We then dropped all the predictors that are uncorrelated with the response: `phone_number`, `state`, `area_code`, `account_length`, and `x_calls`.
 
 ```{r EDA, message=FALSE, warning=FALSE}
-library(tidyverse)
-data <- read_csv("Customer_telecom.csv")
-
 # take a peak at the data
 head(data)
 
